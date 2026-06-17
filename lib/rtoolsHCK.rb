@@ -1199,8 +1199,6 @@ class RToolsHCK
   def run_on_machine(machine, cmd)
     handle_action_exceptions(__method__) do
       ret = machine_run(machine, cmd)
-      return (@json ? { 'result' => 'Success' } : true) if ret.empty?
-
       @json ? { 'result' => 'Success', 'content' => ret } : true
     end
   end
