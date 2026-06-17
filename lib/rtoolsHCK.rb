@@ -157,6 +157,20 @@ class RToolsHCK
 
   private
 
+  # Actions that can be performed in no_studio mode (client-only actions)
+  CLIENT_ACTIONS = %i[
+    start_client_services
+    get_machine_system_info
+    machine_shutdown
+    run_on_machine
+    upload_to_machine
+    download_from_machine
+    exists_on_machine?
+    delete_on_machine
+    install_machine_driver_package
+    close
+  ].freeze
+
   # init_opts initialization defaults
   INIT_OPTS_DEFAULTS = {
     addr: '192.168.100.1',
@@ -173,7 +187,8 @@ class RToolsHCK
     logger: nil,
     log_to_stdout: false,
     outp_dir: nil,
-    r_script_file: 'C:\\toolsHCK.ps1'
+    r_script_file: 'C:\\toolsHCK.ps1',
+    no_studio: false
   }.freeze
 
   def validate_init_opts(init_opts)
@@ -233,11 +248,15 @@ class RToolsHCK
   def do_initialize(init_opts)
     load_outp_dir(init_opts[:outp_dir])
     load_instance_variables(init_opts)
-    logger('debug', 'initialize') { "#{@user}:#{@pass}@#{@addr}" }
-    load_winrm_ps
-    load_winrm_fs
-    start_studio_services
-    load_toolshck
+    if @no_studio
+      logger('debug', 'initialize') { "no-studio mode: clients=#{@clients_addrs.keys}" }
+    else
+      logger('debug', 'initialize') { "#{@user}:#{@pass}@#{@addr}" }
+      load_winrm_ps
+      load_winrm_fs
+      start_studio_services
+      load_toolshck
+    end
     @closed = false
   end
 
@@ -263,6 +282,7 @@ class RToolsHCK
     @timeout = init_opts[:timeout]
     @json = init_opts[:json]
     @r_script_file = init_opts[:r_script_file]
+    @no_studio = init_opts[:no_studio]
   end
 
   def winrm_options_factory(addr, port, user, pass)
@@ -408,6 +428,9 @@ class RToolsHCK
 
   def handle_action_exceptions(action, &block)
     raise RToolsHCKError.new('action'), 'instance is closed.' if @closed
+    if @no_studio && !CLIENT_ACTIONS.include?(action)
+      raise RToolsHCKError.new(action.to_s), 'not supported in no_studio mode.'
+    end
 
     log_action_call(action, block.binding)
     handle_exceptions do
@@ -1465,6 +1488,8 @@ class RToolsHCK
   private
 
   def priv_close
+    return if @no_studio
+
     unload_toolshck
     unload_winrm_ps
   end
